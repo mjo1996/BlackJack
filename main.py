@@ -35,15 +35,17 @@ class BlackjackController:
         self.stand_button = None
         self.double_button = None
         self.split_button = None
+        self.surrender_button = None
         
         # Colors
         self.GREEN = (0, 128, 0)
         self.RED = (200, 0, 0)
         self.ORANGE = (255, 165, 0)
-        self.YELLOW = (255, 255, 0)
+        self.YELLOW = (184, 134, 11)
         self.WHITE = (255, 255, 255)
         self.BLACK = (0, 0, 0)
         self.GRAY = (128, 128, 128)
+        self.PURPLE = (128, 0, 128)
     
     def build_objects(self):
         """Build game objects from settings"""
@@ -105,6 +107,8 @@ class BlackjackController:
                 self.player_double()
             elif self.split_button.collidepoint(mouse_pos) and self._can_split(self.player_hand):
                 self.player_split()
+            elif self.surrender_button.collidepoint(mouse_pos):
+                self.player_surrender()
         
         elif self.game_state == GameState.OUTCOME:
             # Any click proceeds to next hand
@@ -124,7 +128,7 @@ class BlackjackController:
         button_width = 80
         button_height = 40
         start_x = 50
-        start_y = self.app.height - 80
+        start_y = self.app.height - 150
         spacing = 10
         
         self.bet_buttons = []
@@ -142,12 +146,13 @@ class BlackjackController:
         button_y = self.app.height - 80
         
         spacing = 20
-        start_x = (self.app.width - (4 * button_width + 3 * spacing)) // 2
+        start_x = (self.app.width - (5 * button_width + 4 * spacing)) // 2
         
         self.hit_button = pygame.Rect(start_x, button_y, button_width, button_height)
         self.stand_button = pygame.Rect(start_x + button_width + spacing, button_y, button_width, button_height)
         self.double_button = pygame.Rect(start_x + 2 * (button_width + spacing), button_y, button_width, button_height)
         self.split_button = pygame.Rect(start_x + 3 * (button_width + spacing), button_y, button_width, button_height)
+        self.surrender_button = pygame.Rect(start_x + 4 * (button_width + spacing), button_y, button_width, button_height)
     
     def _card_value(self, card):
         """Get numeric value of a card"""
@@ -379,6 +384,12 @@ class BlackjackController:
         self.game_state = GameState.PLAYING
         self._create_action_buttons()
     
+    def player_surrender(self):
+        """Player surrenders and gets half their bet back"""
+        self.coins += self.current_bet / 2
+        self.game_state = GameState.OUTCOME
+        self.message = "You surrendered!"
+    
     def dealer_play(self):
         """Dealer plays their hand"""
         while self._hand_value(self.dealer_hand) < 17:
@@ -567,6 +578,10 @@ class BlackjackController:
                 # Only show split if can split
                 if self._can_split(self.player_hand):
                     self._draw_button(screen, self.split_button, "Split", self.YELLOW)
+                
+                # Draw surrender button (only on first draw, 2 cards, and not after split)
+                if len(self.player_hand) == 2 and not self.split_active:
+                    self._draw_button(screen, self.surrender_button, "Surrender", self.PURPLE)
             
             elif self.game_state == GameState.OUTCOME:
                 # Draw outcome message
@@ -627,7 +642,7 @@ class GameApp:
 
         pygame.init()
         self.width, self.height = size
-        self.screen = pygame.display.set_mode(size)
+        self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
         pygame.display.set_caption(title)
         self.background = bg
         self.clock = pygame.time.Clock()
@@ -648,7 +663,12 @@ class GameApp:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONUP:
+                elif event.type == pygame.VIDEORESIZE:
+                    self.width, self.height = event.size
+                    self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+                    self.controller._create_bet_buttons()
+                    self.controller._create_action_buttons()
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     self.controller.process_mouse_events(event.button, event.pos)
 
             self.screen.fill(self.background)
