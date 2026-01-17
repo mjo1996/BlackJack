@@ -12,7 +12,7 @@
 	},
 	"game": {
 		"initial_coins": 1000,
-		"hourly_bonus": 20,
+		"quarterly_bonus": 100,
 		"num_decks": 6,
 		"bet_amounts": [1000, 500, 250, 100, 50, 25, 10, 5, 2.5, 1, 0.1]
 	}

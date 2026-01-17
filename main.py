@@ -513,11 +513,11 @@ class BlackjackController:
     def check_hourly_bonus(self):
         """Check if player can get hourly bonus"""
         now = datetime.now()
-        hourly_bonus = self.settings_json.get("game", {}).get("hourly_bonus", 100)
+        quarterly_bonus = self.settings_json.get("game", {}).get("quarterly_bonus", 100)
         if now - self.last_bonus_time >= timedelta(minutes=15):
-            self.coins += hourly_bonus
+            self.coins += quarterly_bonus
             self.last_bonus_time = now
-            self.message = f"You got {hourly_bonus} coins!"
+            self.message = f"You got {quarterly_bonus} coins!"
     
     def reset_hand(self):
         """Reset for next hand"""
