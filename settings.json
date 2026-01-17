@@ -2,7 +2,7 @@
 	"window": {
 		"size": [1200, 800],
 		"title": "Blackjack",
-		"background_color": [34, 139, 34]
+		"background_color": [0, 80, 0]
 	},
 	"card": {
 		"size": [80, 120],

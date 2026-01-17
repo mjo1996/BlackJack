@@ -37,15 +37,21 @@ class BlackjackController:
         self.split_button = None
         self.surrender_button = None
         
-        # Colors
-        self.GREEN = (0, 128, 0)
-        self.RED = (200, 0, 0)
-        self.ORANGE = (255, 165, 0)
-        self.YELLOW = (184, 134, 11)
+        # Modern color palette
+        self.DARK_GREEN = (0, 100, 0)  # Casino felt
+        self.GOLD = (255, 215, 0)  # Gold accents
+        self.LIGHT_GOLD = (255, 235, 150)
+        self.GREEN = (0, 150, 0)  # Success/positive actions
+        self.RED = (220, 20, 60)  # Crimson for stand/surrender
+        self.ORANGE = (255, 140, 0)  # Dark orange for double
+        self.YELLOW = (255, 200, 0)  # Bright yellow for split
+        self.PURPLE = (138, 43, 226)  # Violet for surrender
         self.WHITE = (255, 255, 255)
-        self.BLACK = (0, 0, 0)
-        self.GRAY = (128, 128, 128)
-        self.PURPLE = (128, 0, 128)
+        self.BLACK = (20, 20, 20)
+        self.DARK_GRAY = (60, 60, 60)
+        self.GRAY = (120, 120, 120)
+        self.LIGHT_GRAY = (200, 200, 200)
+        self.CARD_BACK_COLOR = (25, 25, 112)  # Midnight blue for card backs
     
     def build_objects(self):
         """Build game objects from settings"""
@@ -125,11 +131,11 @@ class BlackjackController:
     
     def _create_bet_buttons(self):
         """Create betting option buttons"""
-        button_width = 80
-        button_height = 40
+        button_width = 100
+        button_height = 50
         start_x = 50
-        start_y = self.app.height - 150
-        spacing = 10
+        start_y = self.app.height - 180
+        spacing = 15
         
         self.bet_buttons = []
         for i, amount in enumerate(self.bet_amounts):
@@ -141,11 +147,11 @@ class BlackjackController:
     
     def _create_action_buttons(self):
         """Create action buttons for player turn"""
-        button_width = 100
-        button_height = 50
-        button_y = self.app.height - 80
+        button_width = 120
+        button_height = 60
+        button_y = self.app.height - 100
         
-        spacing = 20
+        spacing = 15
         start_x = (self.app.width - (5 * button_width + 4 * spacing)) // 2
         
         self.hit_button = pygame.Rect(start_x, button_y, button_width, button_height)
@@ -499,27 +505,69 @@ class BlackjackController:
     def draw(self):
         """Draw game screen"""
         screen = self.app.screen
-        font_large = pygame.font.Font(None, 48)
-        font_medium = pygame.font.Font(None, 36)
-        font_small = pygame.font.Font(None, 24)
+        
+        # Try to load a nicer font, fallback to default
+        try:
+            font_large = pygame.font.Font(pygame.font.get_default_font(), 56)
+            font_medium = pygame.font.Font(pygame.font.get_default_font(), 40)
+            font_small = pygame.font.Font(pygame.font.get_default_font(), 28)
+            font_tiny = pygame.font.Font(pygame.font.get_default_font(), 20)
+        except:
+            font_large = pygame.font.Font(None, 56)
+            font_medium = pygame.font.Font(None, 40)
+            font_small = pygame.font.Font(None, 28)
+            font_tiny = pygame.font.Font(None, 20)
         
         if self.game_state == GameState.BETTING:
-            title = font_large.render("Place your bet", True, self.WHITE)
-            screen.blit(title, (self.app.width // 2 - title.get_width() // 2, 50))
+            # Draw title with shadow effect
+            title = font_large.render("Place Your Bet", True, self.GOLD)
+            title_shadow = font_large.render("Place Your Bet", True, self.BLACK)
+            title_x = self.app.width // 2 - title.get_width() // 2
+            screen.blit(title_shadow, (title_x + 3, 53))
+            screen.blit(title, (title_x, 50))
             
-            # Draw bet buttons (use green for enabled buttons so text is visible)
+            # Draw bet buttons with modern styling
             for button in self.bet_buttons:
                 amount = button['amount']
-                color = self.GRAY if self.coins < amount else self.GREEN
-                self._draw_button(screen, button['rect'], f"{amount}", color)
+                is_enabled = self.coins >= amount
+                color = self.DARK_GRAY if not is_enabled else self.GOLD
+                self._draw_button_modern(screen, button['rect'], f"{amount}", color, is_enabled)
             
-            # Draw coin display (rounded to 3 decimals)
-            coin_text = font_medium.render(f"Coins: {self.coins:.3f}", True, self.WHITE)
-            screen.blit(coin_text, (50, 150))
+            # Draw coin display with gold styling
+            coin_bg = pygame.Rect(40, 140, 300, 60)
+            coin_surf = pygame.Surface((coin_bg.width, coin_bg.height))
+            coin_surf.set_alpha(180)
+            coin_surf.fill((0, 0, 0))
+            screen.blit(coin_surf, coin_bg)
+            pygame.draw.rect(screen, self.GOLD, coin_bg, 3)
+            
+            coin_text_str = f"Coins: {self.coins:.2f}"
+            coin_text_surf, _ = self._get_fitted_text(coin_text_str, coin_bg.width - 20, coin_bg.height - 10, 40)
+            coin_text = font_medium.render(coin_text_str, True, self.GOLD)
+            # Scale if needed
+            if coin_text.get_width() > coin_bg.width - 20:
+                scale = (coin_bg.width - 20) / coin_text.get_width()
+                new_size = int(font_medium.get_height() * scale)
+                try:
+                    font_coin = pygame.font.Font(pygame.font.get_default_font(), new_size)
+                except:
+                    font_coin = pygame.font.Font(None, new_size)
+                coin_text = font_coin.render(coin_text_str, True, self.GOLD)
+            coin_text_rect = coin_text.get_rect(center=coin_bg.center)
+            screen.blit(coin_text, coin_text_rect)
         
         elif self.game_state == GameState.PLAYING or self.game_state == GameState.OUTCOME:
-            # Draw dealer hand
-            dealer_text = font_medium.render("Dealer", True, self.WHITE)
+            # Draw dealer section with background
+            dealer_bg = pygame.Rect(30, 30, self.app.width - 60, 280)
+            dealer_surf = pygame.Surface((dealer_bg.width, dealer_bg.height))
+            dealer_surf.set_alpha(100)
+            dealer_surf.fill((0, 0, 0))
+            screen.blit(dealer_surf, dealer_bg)
+            pygame.draw.rect(screen, self.GOLD, dealer_bg, 2)
+            
+            dealer_text = font_medium.render("Dealer", True, self.GOLD)
+            dealer_shadow = font_medium.render("Dealer", True, self.BLACK)
+            screen.blit(dealer_shadow, (53, 53))
             screen.blit(dealer_text, (50, 50))
             
             if self.game_state == GameState.PLAYING:
@@ -536,98 +584,256 @@ class BlackjackController:
             else:
                 dealer_value = self._hand_value(self.dealer_hand)
             dealer_value_text = font_small.render(f"Value: {dealer_value}", True, self.WHITE)
-            screen.blit(dealer_value_text, (50, 250))
+            screen.blit(dealer_value_text, (50, 270))
             
-            # Draw player hand(s)
-            player_text = font_medium.render("You", True, self.WHITE)
-            screen.blit(player_text, (50, 350))
+            # Draw player section with background
+            player_bg = pygame.Rect(30, 330, self.app.width - 60, 280)
+            player_surf = pygame.Surface((player_bg.width, player_bg.height))
+            player_surf.set_alpha(100)
+            player_surf.fill((0, 0, 0))
+            screen.blit(player_surf, player_bg)
+            pygame.draw.rect(screen, self.GOLD, player_bg, 2)
+            
+            player_text = font_medium.render("You", True, self.GOLD)
+            player_shadow = font_medium.render("You", True, self.BLACK)
+            screen.blit(player_shadow, (53, 333))
+            screen.blit(player_text, (50, 330))
 
             if self.split_active and self.split_hands:
                 # Draw both split hands side by side and highlight current
                 self._draw_cards(screen, self.split_hands[0], 50, 400)
                 self._draw_cards(screen, self.split_hands[1], 350, 400)
 
+                # Highlight current hand
+                current_hand_x = 50 + self.current_split_index * 300
+                highlight_rect = pygame.Rect(current_hand_x - 10, 390, 200, 140)
+                highlight_surf = pygame.Surface((highlight_rect.width, highlight_rect.height))
+                highlight_surf.set_alpha(50)
+                highlight_surf.fill((255, 255, 0))
+                screen.blit(highlight_surf, highlight_rect)
+                pygame.draw.rect(screen, self.GOLD, highlight_rect, 3)
+
                 # show value for current hand
                 hand = self.split_hands[self.current_split_index]
                 player_value = self._hand_value(hand)
                 player_value_text = font_small.render(f"Value: {player_value}", True, self.WHITE)
-                screen.blit(player_value_text, (50 + self.current_split_index * 300, 550))
+                screen.blit(player_value_text, (current_hand_x, 570))
             else:
                 self._draw_cards(screen, self.player_hand, 50, 400)
                 player_value = self._hand_value(self.player_hand)
                 player_value_text = font_small.render(f"Value: {player_value}", True, self.WHITE)
-                screen.blit(player_value_text, (50, 550))
+                screen.blit(player_value_text, (50, 570))
             
-            # Draw bet
-            bet_text = font_small.render(f"Bet: {self.current_bet}", True, self.WHITE)
-            screen.blit(bet_text, (self.app.width - 250, 50))
+            # Draw info panel on the right
+            info_panel = pygame.Rect(self.app.width - 280, 30, 250, 150)
+            info_surf = pygame.Surface((info_panel.width, info_panel.height))
+            info_surf.set_alpha(180)
+            info_surf.fill((0, 0, 0))
+            screen.blit(info_surf, info_panel)
+            pygame.draw.rect(screen, self.GOLD, info_panel, 3)
+            
+            # Bet text - fit within panel
+            bet_text_str = f"Bet: {self.current_bet:.2f}"
+            bet_text = font_small.render(bet_text_str, True, self.GOLD)
+            if bet_text.get_width() > info_panel.width - 20:
+                scale = (info_panel.width - 20) / bet_text.get_width()
+                new_size = int(font_small.get_height() * scale)
+                try:
+                    font_bet = pygame.font.Font(pygame.font.get_default_font(), new_size)
+                except:
+                    font_bet = pygame.font.Font(None, new_size)
+                bet_text = font_bet.render(bet_text_str, True, self.GOLD)
+            bet_text_rect = bet_text.get_rect(left=info_panel.left + 10, top=info_panel.top + 20)
+            screen.blit(bet_text, bet_text_rect)
 
-            # Draw coins (rounded to 3 decimals)
-            coin_text = font_small.render(f"Coins: {self.coins:.3f}", True, self.WHITE)
-            screen.blit(coin_text, (self.app.width - 250, 100))
+            # Coin text - fit within panel
+            coin_text_str = f"Coins: {self.coins:.2f}"
+            coin_text = font_small.render(coin_text_str, True, self.GOLD)
+            if coin_text.get_width() > info_panel.width - 20:
+                scale = (info_panel.width - 20) / coin_text.get_width()
+                new_size = int(font_small.get_height() * scale)
+                try:
+                    font_coin = pygame.font.Font(pygame.font.get_default_font(), new_size)
+                except:
+                    font_coin = pygame.font.Font(None, new_size)
+                coin_text = font_coin.render(coin_text_str, True, self.GOLD)
+            coin_text_rect = coin_text.get_rect(left=info_panel.left + 10, top=info_panel.top + 60)
+            screen.blit(coin_text, coin_text_rect)
             
             if self.game_state == GameState.PLAYING:
-                # Draw action buttons
-                self._draw_button(screen, self.hit_button, "Hit", self.GREEN)
-                self._draw_button(screen, self.stand_button, "Stand", self.RED)
+                # Draw action buttons with modern styling
+                self._draw_button_modern(screen, self.hit_button, "Hit", self.GREEN, True)
+                self._draw_button_modern(screen, self.stand_button, "Stand", self.RED, True)
                 
                 # Only show double if have exactly 2 cards
                 if len(self.player_hand) == 2:
-                    self._draw_button(screen, self.double_button, "Double", self.ORANGE)
+                    self._draw_button_modern(screen, self.double_button, "Double", self.ORANGE, True)
                 
                 # Only show split if can split
                 if self._can_split(self.player_hand):
-                    self._draw_button(screen, self.split_button, "Split", self.YELLOW)
+                    self._draw_button_modern(screen, self.split_button, "Split", self.YELLOW, True)
                 
                 # Draw surrender button (only on first draw, 2 cards, and not after split)
                 if len(self.player_hand) == 2 and not self.split_active:
-                    self._draw_button(screen, self.surrender_button, "Surrender", self.PURPLE)
+                    self._draw_button_modern(screen, self.surrender_button, "Surrender", self.PURPLE, True)
             
             elif self.game_state == GameState.OUTCOME:
-                # Draw outcome message
-                message_text = font_large.render(self.message, True, self.WHITE)
-                screen.blit(message_text, (self.app.width // 2 - message_text.get_width() // 2, 700))
+                # Draw outcome message with background
+                outcome_bg = pygame.Rect(self.app.width // 2 - 400, 650, 800, 120)
+                outcome_surf = pygame.Surface((outcome_bg.width, outcome_bg.height))
+                outcome_surf.set_alpha(200)
+                outcome_surf.fill((0, 0, 0))
+                screen.blit(outcome_surf, outcome_bg)
+                pygame.draw.rect(screen, self.GOLD, outcome_bg, 4)
                 
-                next_text = font_small.render("Click to continue...", True, self.WHITE)
-                screen.blit(next_text, (self.app.width // 2 - next_text.get_width() // 2, 750))
+                # Fit message text within outcome box
+                message_text = font_large.render(self.message, True, self.GOLD)
+                if message_text.get_width() > outcome_bg.width - 40:
+                    scale = (outcome_bg.width - 40) / message_text.get_width()
+                    new_size = int(font_large.get_height() * scale)
+                    try:
+                        font_msg = pygame.font.Font(pygame.font.get_default_font(), new_size)
+                    except:
+                        font_msg = pygame.font.Font(None, new_size)
+                    message_text = font_msg.render(self.message, True, self.GOLD)
+                
+                message_shadow = message_text.copy()
+                message_shadow.fill(self.BLACK)
+                message_shadow.set_alpha(200)
+                
+                msg_rect = message_text.get_rect(center=(outcome_bg.centerx, outcome_bg.centery - 15))
+                screen.blit(message_shadow, (msg_rect.x + 3, msg_rect.y + 3))
+                screen.blit(message_text, msg_rect)
+                
+                # Fit "Click to continue" text
+                next_text = font_small.render("Click to continue...", True, self.LIGHT_GRAY)
+                if next_text.get_width() > outcome_bg.width - 40:
+                    scale = (outcome_bg.width - 40) / next_text.get_width()
+                    new_size = int(font_small.get_height() * scale)
+                    try:
+                        font_next = pygame.font.Font(pygame.font.get_default_font(), new_size)
+                    except:
+                        font_next = pygame.font.Font(None, new_size)
+                    next_text = font_next.render("Click to continue...", True, self.LIGHT_GRAY)
+                next_rect = next_text.get_rect(center=(outcome_bg.centerx, outcome_bg.bottom - 25))
+                screen.blit(next_text, next_rect)
     
     def _draw_cards(self, screen, cards, start_x, start_y, hide_first=False):
         """Draw cards on screen using pygame_cards"""
-        spacing = 20
+        spacing = 25
         card_size = tuple(self.settings_json.get("card", {}).get("size", [80, 120]))
         for i, card in enumerate(cards):
             x = start_x + i * (card_size[0] + spacing)
             y = start_y
 
             if hide_first and i == 0:
-                # Draw card back as a filled rect
+                # Draw card back with modern design
                 back = pygame.Surface(card_size)
-                back.fill((50, 50, 50))
-                pygame.draw.rect(back, self.WHITE, back.get_rect(), 2)
+                back.fill(self.CARD_BACK_COLOR)
+                # Add border
+                pygame.draw.rect(back, self.WHITE, back.get_rect(), 3)
+                # Add pattern
+                pattern_color = (50, 50, 150)
+                for j in range(3):
+                    for k in range(4):
+                        pygame.draw.circle(back, pattern_color, 
+                                         (20 + j * 30, 20 + k * 30), 8)
+                # Add shadow effect
+                shadow = pygame.Surface((card_size[0] + 4, card_size[1] + 4))
+                shadow.set_alpha(100)
+                shadow.fill((0, 0, 0))
+                screen.blit(shadow, (x - 2, y + 2))
                 screen.blit(back, (x, y))
             else:
-                # Draw card front using pygame_cards graphics
+                # Draw card front using pygame_cards graphics with shadow
+                shadow = pygame.Surface((card_size[0] + 4, card_size[1] + 4))
+                shadow.set_alpha(100)
+                shadow.fill((0, 0, 0))
+                screen.blit(shadow, (x - 2, y + 2))
                 surf = card.graphics.surface
                 screen.blit(surf, (x, y))
     
     def _draw_button(self, screen, button, label, color):
-        """Draw a button"""
+        """Draw a button (legacy method for compatibility)"""
+        rect = button['rect'] if isinstance(button, dict) else button
+        self._draw_button_modern(screen, rect, label, color, True)
+    
+    def _get_fitted_text(self, text, max_width, max_height, initial_size=24):
+        """Get a text surface that fits within the given dimensions"""
+        try:
+            font = pygame.font.Font(pygame.font.get_default_font(), initial_size)
+        except:
+            font = pygame.font.Font(None, initial_size)
+        
+        text_surface = font.render(str(text), True, (255, 255, 255))
+        
+        # If text fits, return it
+        if text_surface.get_width() <= max_width and text_surface.get_height() <= max_height:
+            return text_surface, font
+        
+        # Otherwise, scale down the font size
+        size = initial_size
+        while size > 8:
+            size -= 1
+            try:
+                font = pygame.font.Font(pygame.font.get_default_font(), size)
+            except:
+                font = pygame.font.Font(None, size)
+            text_surface = font.render(str(text), True, (255, 255, 255))
+            if text_surface.get_width() <= max_width and text_surface.get_height() <= max_height:
+                return text_surface, font
+        
+        # If still too large, return the smallest version
+        return text_surface, font
+    
+    def _draw_button_modern(self, screen, button, label, color, enabled=True):
+        """Draw a modern styled button with rounded corners and shadow"""
         # Accept either a pygame.Rect or a dict with 'rect'
         rect = button['rect'] if isinstance(button, dict) else button
+        
+        if not enabled:
+            color = self.DARK_GRAY
+        
+        # Draw shadow
+        shadow_rect = pygame.Rect(rect.x + 3, rect.y + 3, rect.width, rect.height)
+        shadow_surf = pygame.Surface((rect.width, rect.height))
+        shadow_surf.set_alpha(150)
+        shadow_surf.fill((0, 0, 0))
+        screen.blit(shadow_surf, (shadow_rect.x, shadow_rect.y))
+        
+        # Draw button with gradient effect (simulated with lighter top edge)
         pygame.draw.rect(screen, color, rect)
-        pygame.draw.rect(screen, self.WHITE, rect, 2)
-
-        font_small = pygame.font.Font(None, 24)
-        # choose contrasting text color based on button fill
+        
+        # Add highlight on top edge
+        highlight_color = tuple(min(255, c + 40) for c in color)
+        pygame.draw.line(screen, highlight_color, (rect.x, rect.y), (rect.x + rect.width, rect.y), 2)
+        
+        # Add border
+        border_color = self.WHITE if enabled else self.GRAY
+        pygame.draw.rect(screen, border_color, rect, 3)
+        
+        # Get text that fits within button (with padding)
+        padding = 10
+        max_text_width = rect.width - padding
+        max_text_height = rect.height - padding
+        
+        # Choose text color based on button color brightness
         try:
-            avg = (rect_color := color)[0] + rect_color[1] + rect_color[2]
+            avg = color[0] + color[1] + color[2]
             avg = avg / 3
         except Exception:
             avg = 0
         text_color = self.BLACK if avg > 180 else self.WHITE
-        text = font_small.render(str(label), True, text_color)
-        text_rect = text.get_rect(center=rect.center)
-        screen.blit(text, text_rect)
+        
+        # Get fitted text surface and font
+        text_surface, font = self._get_fitted_text(str(label), max_text_width, max_text_height, 24)
+        
+        # Re-render with correct color
+        text_surface = font.render(str(label), True, text_color)
+        text_shadow = font.render(str(label), True, self.BLACK)
+        text_rect = text_surface.get_rect(center=rect.center)
+        screen.blit(text_shadow, (text_rect.x + 2, text_rect.y + 2))
+        screen.blit(text_surface, text_rect)
 
 
 class GameApp:
@@ -638,7 +844,8 @@ class GameApp:
         win = self.settings_json.get('window', {})
         size = tuple(win.get('size', (1200, 800)))
         title = win.get('title', 'Game')
-        bg = tuple(win.get('background_color', (34, 139, 34)))
+        # Use a darker, richer green for casino feel
+        bg = tuple(win.get('background_color', (0, 80, 0)))
 
         pygame.init()
         self.width, self.height = size
