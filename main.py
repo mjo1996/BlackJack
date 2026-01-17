@@ -29,6 +29,10 @@ class BlackjackController:
         self.message = ""
         self.message_time = 0
         
+        # Repeat bet functionality
+        self.repeat_bet_active = False
+        self.repeat_bet_amount = 0
+        
         # UI elements
         self.bet_buttons = []
         self.hit_button = None
@@ -36,6 +40,8 @@ class BlackjackController:
         self.double_button = None
         self.split_button = None
         self.surrender_button = None
+        self.repeat_checkbox = None
+        self.repeat_exit_button = None
         
         # Modern color palette
         self.DARK_GREEN = (0, 100, 0)  # Casino felt
@@ -100,12 +106,21 @@ class BlackjackController:
     def process_mouse_events(self, mouse_button, mouse_pos):
         """Handle mouse clicks"""
         if self.game_state == GameState.BETTING:
+            # Check repeat checkbox
+            if self.repeat_checkbox and self.repeat_checkbox.collidepoint(mouse_pos):
+                self.repeat_bet_active = not self.repeat_bet_active
+            
+            # Check bet buttons
             for button in self.bet_buttons:
                 if button['rect'].collidepoint(mouse_pos):
                     self.place_bet(button['amount'])
         
         elif self.game_state == GameState.PLAYING:
-            if self.hit_button.collidepoint(mouse_pos):
+            # Check repeat exit button
+            if self.repeat_exit_button and self.repeat_exit_button.collidepoint(mouse_pos):
+                self.repeat_bet_active = False
+                self.repeat_bet_amount = 0
+            elif self.hit_button.collidepoint(mouse_pos):
                 self.player_hit()
             elif self.stand_button.collidepoint(mouse_pos):
                 self.player_stand()
@@ -117,8 +132,13 @@ class BlackjackController:
                 self.player_surrender()
         
         elif self.game_state == GameState.OUTCOME:
-            # Any click proceeds to next hand
-            self.reset_hand()
+            # Check repeat exit button
+            if self.repeat_exit_button and self.repeat_exit_button.collidepoint(mouse_pos):
+                self.repeat_bet_active = False
+                self.repeat_bet_amount = 0
+            else:
+                # Any other click proceeds to next hand
+                self.reset_hand()
     
     def restart_game(self):
         """Restart the game"""
@@ -481,6 +501,11 @@ class BlackjackController:
         if self.coins >= amount:
             self.current_bet = amount
             self.coins -= amount
+            
+            # If repeat bet is active, remember this amount
+            if self.repeat_bet_active:
+                self.repeat_bet_amount = amount
+            
             self.deal_initial_cards()
         else:
             self.message = "Not enough coins!"
@@ -488,8 +513,8 @@ class BlackjackController:
     def check_hourly_bonus(self):
         """Check if player can get hourly bonus"""
         now = datetime.now()
-        hourly_bonus = self.settings_json.get("game", {}).get("hourly_bonus", 20)
-        if now - self.last_bonus_time >= timedelta(hours=1):
+        hourly_bonus = self.settings_json.get("game", {}).get("hourly_bonus", 100)
+        if now - self.last_bonus_time >= timedelta(minutes=15):
             self.coins += hourly_bonus
             self.last_bonus_time = now
             self.message = f"You got {hourly_bonus} coins!"
@@ -499,8 +524,22 @@ class BlackjackController:
         self.player_hand = []
         self.dealer_hand = []
         self.current_bet = 0
-        self.game_state = GameState.BETTING
-        self.message = "Place your bet"
+        
+        # If repeat bet is active, automatically place the same bet
+        if self.repeat_bet_active and self.repeat_bet_amount > 0:
+            if self.coins >= self.repeat_bet_amount:
+                self.current_bet = self.repeat_bet_amount
+                self.coins -= self.repeat_bet_amount
+                self.deal_initial_cards()
+            else:
+                # Not enough coins for repeat bet, disable repeat mode
+                self.repeat_bet_active = False
+                self.repeat_bet_amount = 0
+                self.game_state = GameState.BETTING
+                self.message = "Not enough coins for repeat bet"
+        else:
+            self.game_state = GameState.BETTING
+            self.message = "Place your bet"
     
     def draw(self):
         """Draw game screen"""
@@ -525,6 +564,43 @@ class BlackjackController:
             title_x = self.app.width // 2 - title.get_width() // 2
             screen.blit(title_shadow, (title_x + 3, 53))
             screen.blit(title, (title_x, 50))
+            
+            # Create repeat bet checkbox if not exists
+            if self.repeat_checkbox is None:
+                checkbox_size = 30
+                checkbox_x = self.app.width - 250
+                checkbox_y = 140
+                self.repeat_checkbox = pygame.Rect(checkbox_x, checkbox_y, checkbox_size, checkbox_size)
+            
+            # Draw repeat bet checkbox
+            checkbox_bg = pygame.Rect(self.repeat_checkbox.x - 5, self.repeat_checkbox.y - 5, 
+                                     self.repeat_checkbox.width + 10, self.repeat_checkbox.height + 10)
+            checkbox_surf = pygame.Surface((checkbox_bg.width, checkbox_bg.height))
+            checkbox_surf.set_alpha(180)
+            checkbox_surf.fill((0, 0, 0))
+            screen.blit(checkbox_surf, checkbox_bg)
+            pygame.draw.rect(screen, self.GOLD, checkbox_bg, 2)
+            
+            # Draw checkbox border
+            pygame.draw.rect(screen, self.GOLD, self.repeat_checkbox, 3)
+            
+            # Draw checkmark if active
+            if self.repeat_bet_active:
+                # Fill checkbox with gold
+                pygame.draw.rect(screen, self.GOLD, self.repeat_checkbox)
+                # Draw checkmark
+                check_padding = 5
+                # Draw checkmark lines
+                pygame.draw.line(screen, self.BLACK,
+                               (self.repeat_checkbox.left + check_padding, self.repeat_checkbox.centery),
+                               (self.repeat_checkbox.centerx - 2, self.repeat_checkbox.bottom - check_padding), 3)
+                pygame.draw.line(screen, self.BLACK,
+                               (self.repeat_checkbox.centerx - 2, self.repeat_checkbox.bottom - check_padding),
+                               (self.repeat_checkbox.right - check_padding, self.repeat_checkbox.top + check_padding), 3)
+            
+            # Draw "Repeat Bet" label
+            repeat_label = font_tiny.render("Repeat Bet", True, self.GOLD)
+            screen.blit(repeat_label, (self.repeat_checkbox.right + 10, self.repeat_checkbox.centery - repeat_label.get_height() // 2))
             
             # Draw bet buttons with modern styling
             for button in self.bet_buttons:
@@ -659,6 +735,36 @@ class BlackjackController:
                 coin_text = font_coin.render(coin_text_str, True, self.GOLD)
             coin_text_rect = coin_text.get_rect(left=info_panel.left + 10, top=info_panel.top + 60)
             screen.blit(coin_text, coin_text_rect)
+            
+            # Draw repeat bet exit button if repeat is active (bottom right of window)
+            if self.repeat_bet_active:
+                # Create exit button if not exists or update position if window resized
+                exit_size = 40
+                exit_x = self.app.width - exit_size - 20
+                exit_y = self.app.height - exit_size - 20
+                self.repeat_exit_button = pygame.Rect(exit_x, exit_y, exit_size, exit_size)
+                
+                # Draw exit button background
+                exit_bg = pygame.Surface((self.repeat_exit_button.width, self.repeat_exit_button.height))
+                exit_bg.set_alpha(200)
+                exit_bg.fill(self.RED)
+                screen.blit(exit_bg, self.repeat_exit_button)
+                pygame.draw.rect(screen, self.WHITE, self.repeat_exit_button, 2)
+                
+                # Draw X mark
+                padding = 10
+                pygame.draw.line(screen, self.WHITE,
+                               (self.repeat_exit_button.left + padding, self.repeat_exit_button.top + padding),
+                               (self.repeat_exit_button.right - padding, self.repeat_exit_button.bottom - padding), 3)
+                pygame.draw.line(screen, self.WHITE,
+                               (self.repeat_exit_button.right - padding, self.repeat_exit_button.top + padding),
+                               (self.repeat_exit_button.left + padding, self.repeat_exit_button.bottom - padding), 3)
+                
+                # Draw "Exit Repeat" label above exit button
+                repeat_label = font_tiny.render("Exit", True, self.GOLD)
+                label_x = self.repeat_exit_button.centerx - repeat_label.get_width() // 2
+                label_y = self.repeat_exit_button.top - 20
+                screen.blit(repeat_label, (label_x, label_y))
             
             if self.game_state == GameState.PLAYING:
                 # Draw action buttons with modern styling
