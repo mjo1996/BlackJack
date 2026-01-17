@@ -771,12 +771,21 @@ class BlackjackController:
                 self._draw_button_modern(screen, self.hit_button, "Hit", self.GREEN, True)
                 self._draw_button_modern(screen, self.stand_button, "Stand", self.RED, True)
                 
-                # Only show double if have exactly 2 cards
-                if len(self.player_hand) == 2:
+                # Determine if double button should be shown
+                # For split hands: show only if current split hand has exactly 2 cards
+                # For regular hand: show only if hand has exactly 2 cards
+                can_double = False
+                if self.split_active:
+                    current_hand = self.split_hands[self.current_split_index]
+                    can_double = len(current_hand) == 2 and self.coins >= self.current_bet
+                else:
+                    can_double = len(self.player_hand) == 2 and self.coins >= self.current_bet
+                
+                if can_double:
                     self._draw_button_modern(screen, self.double_button, "Double", self.ORANGE, True)
                 
-                # Only show split if can split
-                if self._can_split(self.player_hand):
+                # Only show split if can split (and not already split)
+                if not self.split_active and self._can_split(self.player_hand):
                     self._draw_button_modern(screen, self.split_button, "Split", self.YELLOW, True)
                 
                 # Draw surrender button (only on first draw, 2 cards, and not after split)
@@ -957,6 +966,14 @@ class GameApp:
         self.width, self.height = size
         self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
         pygame.display.set_caption(title)
+        
+        # Set window icon
+        try:
+            icon = pygame.image.load('img.jpg')
+            pygame.display.set_icon(icon)
+        except Exception as e:
+            # If icon file not found, continue without icon
+            print(f"Could not load icon: {e}")
         self.background = bg
         self.clock = pygame.time.Clock()
 
