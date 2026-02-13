@@ -1,9 +1,28 @@
-import json
 import pygame
 from pygame_cards.classics import CardSets
 from pygame_cards.set import CardsSet
 from enum import Enum
 from datetime import datetime, timedelta
+
+SETTINGS = {
+    "window": {
+        "size": [1200, 800],
+        "title": "Blackjack",
+        "background_color": [0, 80, 0]
+    },
+    "card": {
+        "size": [80, 120],
+        "front_sprite_path": "img/cards/",
+        "back_sprite_file": "img/back-side.png",
+        "move_speed": 80
+    },
+    "game": {
+        "initial_coins": 1000,
+        "quarterly_bonus": 100,
+        "num_decks": 6,
+        "bet_amounts": [1000, 500, 250, 100, 50, 25, 10, 5, 2.5, 1, 0.1]
+    }
+}
 
 
 class GameState(Enum):
@@ -61,9 +80,9 @@ class BlackjackController:
     
     def build_objects(self):
         """Build game objects from settings"""
-        self.coins = self.settings_json.get("game", {}).get("initial_coins", 1000)
-        self.bet_amounts = self.settings_json.get("game", {}).get("bet_amounts", [1000, 500, 250, 100, 50, 25, 10, 5, 2.5, 1, 0.1])
-        self.num_decks = self.settings_json.get("game", {}).get("num_decks", 6)
+        self.coins = SETTINGS["game"]["initial_coins"]
+        self.bet_amounts = SETTINGS["game"]["bet_amounts"]
+        self.num_decks = SETTINGS["game"]["num_decks"]
         # Create deck as a CardsSet composed of num_decks standard 52-card sets
         self.deck = CardsSet()
         for _ in range(self.num_decks):
@@ -71,7 +90,7 @@ class BlackjackController:
             self.deck.extend(CardSets.n52)
         self.deck.shuffle()
         # Ensure card graphics sizes match settings
-        card_size = tuple(self.settings_json.get("card", {}).get("size", [80, 120]))
+        card_size = tuple(SETTINGS["card"]["size"])
         for c in self.deck:
             c.graphics.size = card_size
         
@@ -142,7 +161,7 @@ class BlackjackController:
     
     def restart_game(self):
         """Restart the game"""
-        self.coins = self.settings_json.get("game", {}).get("initial_coins", 1000)
+        self.coins = SETTINGS["game"]["initial_coins"]
         self.player_hand = []
         self.dealer_hand = []
         self.current_bet = 0
@@ -264,7 +283,7 @@ class BlackjackController:
             for _ in range(self.num_decks):
                 self.deck.extend(CardSets.n52)
             self.deck.shuffle()
-            card_size = tuple(self.settings_json.get("card", {}).get("size", [80, 120]))
+            card_size = tuple(SETTINGS["card"]["size"])
             for c in self.deck:
                 c.graphics.size = card_size
     
@@ -513,7 +532,7 @@ class BlackjackController:
     def check_hourly_bonus(self):
         """Check if player can get hourly bonus"""
         now = datetime.now()
-        quarterly_bonus = self.settings_json.get("game", {}).get("quarterly_bonus", 100)
+        quarterly_bonus = SETTINGS["game"]["quarterly_bonus"]
         if now - self.last_bonus_time >= timedelta(minutes=15):
             self.coins += quarterly_bonus
             self.last_bonus_time = now
@@ -836,7 +855,7 @@ class BlackjackController:
     def _draw_cards(self, screen, cards, start_x, start_y, hide_first=False):
         """Draw cards on screen using pygame_cards"""
         spacing = 25
-        card_size = tuple(self.settings_json.get("card", {}).get("size", [80, 120]))
+        card_size = tuple(SETTINGS["card"]["size"])
         for i, card in enumerate(cards):
             x = start_x + i * (card_size[0] + spacing)
             y = start_y
@@ -952,15 +971,11 @@ class BlackjackController:
 
 
 class GameApp:
-    def __init__(self, json_path: str, game_controller: BlackjackController):
-        with open(json_path, 'r') as f:
-            self.settings_json = json.load(f)
-
-        win = self.settings_json.get('window', {})
-        size = tuple(win.get('size', (1200, 800)))
-        title = win.get('title', 'Game')
-        # Use a darker, richer green for casino feel
-        bg = tuple(win.get('background_color', (0, 80, 0)))
+    def __init__(self, game_controller: BlackjackController):
+        win = SETTINGS["window"]
+        size = tuple(win["size"])
+        title = win["title"]
+        bg = tuple(win["background_color"])
 
         pygame.init()
         self.width, self.height = size
@@ -969,7 +984,7 @@ class GameApp:
         
         # Set window icon
         try:
-            icon = pygame.image.load('img.jpg')
+            icon = pygame.image.load('image.ico')
             pygame.display.set_icon(icon)
         except Exception as e:
             # If icon file not found, continue without icon
@@ -978,12 +993,10 @@ class GameApp:
         self.clock = pygame.time.Clock()
 
         self.card = lambda: None
-        self.card.size = tuple(self.settings_json.get('card', {}).get('size', [80, 120]))
+        self.card.size = tuple(SETTINGS["card"]["size"])
 
         self.controller = game_controller
-        # Provide references required by controller
         self.controller.app = self
-        self.controller.settings_json = self.settings_json
         self.controller.build_objects()
         self.controller.start_game()
 
@@ -1011,7 +1024,7 @@ class GameApp:
 
 def main():
     """Main entry point"""
-    app = GameApp(json_path='settings.json', game_controller=BlackjackController())
+    app = GameApp(game_controller=BlackjackController())
     app.execute()
 
 
