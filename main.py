@@ -41,6 +41,7 @@ class BlackjackController:
         self.split_hands = []
         self.current_split_index = 0
         self.split_finished = []
+        self.split_bets = []
         self.dealer_hand = []
         self.coins = 0
         self.current_bet = 0
@@ -295,8 +296,9 @@ class BlackjackController:
         self.dealer_hand = [self.deck.draw(1)[0], self.deck.draw(1)[0]]
         
         if self._is_blackjack(self.player_hand):
+            # Reveal dealer hand and check for push vs payout
             self.game_state = GameState.OUTCOME
-            self.message = "Blackjack!"
+            self._determine_outcome()
         else:
             self.game_state = GameState.PLAYING
             self._create_action_buttons()
@@ -340,7 +342,7 @@ class BlackjackController:
                 
                 if self._hand_value(self.player_hand) > 21:
                     self.game_state = GameState.OUTCOME
-                    self.message = "Bust! You lose."
+                    self._determine_outcome()
                 elif self._hand_value(self.player_hand) == 21:
                     # Automatically stand on 21
                     self.game_state = GameState.DEALER_TURN
@@ -370,6 +372,7 @@ class BlackjackController:
             hand = self.split_hands[self.current_split_index]
             if len(hand) == 2 and self.coins >= self.current_bet:
                 self.coins -= self.current_bet
+                self.split_bets[self.current_split_index] *= 2
                 # draw one card and then mark this hand finished
                 hand.append(self.deck.draw(1)[0])
                 if self._hand_value(hand) > 21:
@@ -417,6 +420,7 @@ class BlackjackController:
         card0, card1 = self.player_hand[0], self.player_hand[1]
         self.split_hands = [[card0], [card1]]
         self.split_finished = [False, False]
+        self.split_bets = [self.current_bet, self.current_bet]
         self.current_split_index = 0
         self.split_active = True
 
@@ -451,26 +455,27 @@ class BlackjackController:
         if self.split_active:
             # Evaluate each split hand independently using the same dealer hand
             results = []
-            for hand in self.split_hands:
+            for i, hand in enumerate(self.split_hands):
+                hand_bet = self.split_bets[i]
                 player_value = self._hand_value(hand)
                 # Blackjack checks: player blackjack pays 1.5x (i.e., add 2.5x total), tie if dealer also blackjack
                 player_blackjack = self._is_blackjack(hand)
                 dealer_blackjack = self._is_blackjack(self.dealer_hand)
                 if player_blackjack:
                     if dealer_blackjack:
-                        results.append(("push", self.current_bet))
+                        results.append(("push", hand_bet))
                     else:
-                        results.append(("blackjack", self.current_bet * 2.5))
+                        results.append(("blackjack", hand_bet * 2.5))
                 elif player_value > 21:
                     results.append(("lose", 0))
                 elif dealer_value > 21:
-                    results.append(("win", self.current_bet * 2))
+                    results.append(("win", hand_bet * 2))
                 elif player_value > dealer_value:
-                    results.append(("win", self.current_bet * 2))
+                    results.append(("win", hand_bet * 2))
                 elif dealer_value > player_value:
                     results.append(("lose", 0))
                 else:
-                    results.append(("push", self.current_bet))
+                    results.append(("push", hand_bet))
 
             # Sum payouts and create a message summary
             payout = 0
@@ -487,6 +492,7 @@ class BlackjackController:
             self.split_active = False
             self.split_hands = []
             self.split_finished = []
+            self.split_bets = []
             self.current_split_index = 0
             self.current_bet = 0
         else:
