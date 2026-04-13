@@ -27,7 +27,7 @@ A modern, feature-rich Blackjack game built with Python and Pygame. Play against
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/Matinjeddi/BlackJack.git
+git clone https://github.com/mjo1996/BlackJack.git
 cd BlackJack
 ```
 
